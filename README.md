@@ -1,2 +1,5 @@
 # timrc
-my config (vim, zsh, ...)
+
+```bash
+git clone git@github.com:tnicolas42/timrc.git ~/.tim
+```
