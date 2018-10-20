@@ -1,0 +1,6 @@
+[submodule "vim"]
+	path = vim
+	url = git@github.com:tnicolas42/timrc-vim
+[submodule "zsh"]
+	path = zsh
+	url = git@github.com:tnicolas42/timrc-zsh
