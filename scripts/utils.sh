@@ -90,4 +90,5 @@ set_timrc_var () {
 		value="`echo $2 | sed "s=/=\\\\\/=g"`"
 		vim $TIMRC_FILE "+%s/\\s*export\\s\\+$1=\\zs.*\\ze/\"$value\"/g" '+wq'
 	fi
+	export $1="$2"
 }
