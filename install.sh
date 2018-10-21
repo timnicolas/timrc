@@ -60,8 +60,7 @@ fi
 printf "${TITLE_S}init submodules${TITLE_E}"
 git submodule init | eval $verbose
 git submodule update | eval $verbose
-git --git-dir zsh/.git checkout master
-git --git-dir vim/.git checkout master
+git submodule foreach --recursive git checkout master
 
 # init timrc
 printf "${TITLE_S}init timrc${TITLE_E}"
