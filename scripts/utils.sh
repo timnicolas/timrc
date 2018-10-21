@@ -61,6 +61,19 @@ else
 	verbose='> /dev/null'
 fi
 
+init_timrc () {
+	if [ ! -f "$HOME/.zshrc" ]; then
+		touch "$HOME/.zshrc"
+	fi
+	if [ ! -f $TIMRC_FILE ]; then
+		touch $TIMRC_FILE
+	fi
+	if [[ -z "`cat $HOME/.zshrc | grep -E "source[:space:]*" | grep "$TIMRC_FILE"`" ]]; then
+		printf "${ADD_S}add source \"$TIMRC_FILE\" in $HOME/.zshrc${ADD_E}" | eval $verbose
+		echo "source $TIMRC_FILE" >> $HOME/.zshrc
+	fi
+}
+
 #
 #	$1 -> name of config variable
 #	$2 -> value of config variable
@@ -69,10 +82,11 @@ set_timrc_var () {
 	if [ ! -f $TIMRC_FILE ]; then
 		touch $TIMRC_FILE
 	fi
-	printf "${ADD_S}add env variable $1 -> $2${ADD_E}" | eval $verbose
 	if [[ -z "`cat $TIMRC_FILE | grep -E "export[:space:]*" | grep "$1="`" ]]; then
+		printf "${ADD_S}add env variable $1 -> $2${ADD_E}" | eval $verbose
 		echo "export $1=\"$2\"" >> $TIMRC_FILE
 	else
+		printf "${ADD_S}update env variable $1 -> $2${ADD_E}" | eval $verbose
 		value="`echo $2 | sed "s=/=\\\\\/=g"`"
 		vim $TIMRC_FILE "+%s/\\s*export\\s\\+$1=\\zs.*\\ze/\"$value\"/g" '+wq'
 	fi

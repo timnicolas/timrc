@@ -65,13 +65,8 @@ git --git-dir vim/.git checkout master
 
 # init timrc
 printf "${TITLE_S}init timrc${TITLE_E}"
+init_timrc
 set_timrc_var "TIMRC" "`git rev-parse --show-toplevel`"
-if $ZSH; then
-	set_timrc_var "TIMRC_ZSH" "`git rev-parse --show-toplevel`/zsh"
-fi
-if $VIM; then
-	set_timrc_var "TIMRC_VIM" "`git rev-parse --show-toplevel`/vim"
-fi
 
 # install zsh
 if $ZSH; then
