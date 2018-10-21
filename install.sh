@@ -83,7 +83,22 @@ fi
 printf "${TITLE_S}init submodules${TITLE_E}"
 git submodule init | eval $verbose
 git submodule update | eval $verbose
+git --git-dir zsh/.git checkout master
+git --git-dir vim/.git checkout master
 
+# init timrc
+printf "${TITLE_S}init timrc${TITLE_E}"
+source scripts/set_timrc_var.sh
+printf " -> add var: TIMRC\n" | eval $verbose
+set_timrc_var "TIMRC" "`git rev-parse --show-toplevel`"
+if $ZSH; then
+	printf " -> add var: TIMRC_ZSH\n" | eval $verbose
+	set_timrc_var "TIMRC_ZSH" "`git rev-parse --show-toplevel`/zsh"
+fi
+if $VIM; then
+	printf " -> add var: TIMRC_VIM\n" | eval $verbose
+	set_timrc_var "TIMRC_VIM" "`git rev-parse --show-toplevel`/vim"
+fi
 
 # install zsh
 if $ZSH; then
