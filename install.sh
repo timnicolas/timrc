@@ -74,7 +74,6 @@ if $ZSH; then
 	sh zsh/install_zsh.sh $args
 fi
 
-
 # install vim
 if $VIM; then
 	printf "${TITLE_S}install vim${TITLE_E}"
