@@ -57,3 +57,4 @@ Ne pas installer la config vim
 ```bash
 ./install.sh --novim
 ```
+
