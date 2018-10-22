@@ -1,0 +1,16 @@
+# requirements
+zsh
+oh-my-zsh
+vim # vim 8
+git
+
+# install
+flake8
+bat
+tig
+
+# for vim 8
+# ubuntu
+sudo add-apt-repository ppa:jonathonf/vim
+sudo apt update
+sudo apt install vim
