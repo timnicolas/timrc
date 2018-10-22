@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # usage
 USAGE="./install.sh [-h|--help] [-v|--verbose] [--novim] [--nozsh]
@@ -70,11 +70,11 @@ set_timrc_var "TIMRC" "`git rev-parse --show-toplevel`"
 # install zsh
 if $ZSH; then
 	printf "${TITLE_S}install zsh${TITLE_E}"
-	sh zsh/install_zsh.sh $args
+	zsh zsh/install_zsh.sh $args
 fi
 
 # install vim
 if $VIM; then
 	printf "${TITLE_S}install vim${TITLE_E}"
-	sh vim/install_vim.sh $args
+	zsh vim/install_vim.sh $args
 fi

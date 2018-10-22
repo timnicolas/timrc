@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # variables
 TIMRC_FILE="$HOME/.timrc"
@@ -68,7 +68,7 @@ init_timrc () {
 	if [ ! -f $TIMRC_FILE ]; then
 		touch $TIMRC_FILE
 	fi
-	if [[ -z "`cat $HOME/.zshrc | grep -E "source[:space:]*" | grep "$TIMRC_FILE"`" ]]; then
+	if [[ -z "`cat $HOME/.zshrc | grep -E "source *" | grep "$TIMRC_FILE"`" ]]; then
 		printf "${ADD_S}add source \"$TIMRC_FILE\" in $HOME/.zshrc${ADD_E}" | eval $verbose
 		echo "source $TIMRC_FILE" >> $HOME/.zshrc
 	fi
@@ -82,7 +82,7 @@ set_timrc_var () {
 	if [ ! -f $TIMRC_FILE ]; then
 		touch $TIMRC_FILE
 	fi
-	if [[ -z "`cat $TIMRC_FILE | grep -E "export[:space:]*" | grep "$1="`" ]]; then
+	if [[ -z "`cat $TIMRC_FILE | grep -E "export *" | grep "$1="`" ]]; then
 		printf "${ADD_S}add env variable $1 -> $2${ADD_E}" | eval $verbose
 		echo "export $1=\"$2\"" >> $TIMRC_FILE
 	else
