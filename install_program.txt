@@ -8,6 +8,7 @@ git
 flake8
 bat
 tig
+tmux
 
 # for vim 8
 # ubuntu
