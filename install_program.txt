@@ -11,6 +11,7 @@ bat
 tig
 tmux
 gcc
+xclip
 
 # for vim 8
 # ubuntu
