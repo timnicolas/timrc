@@ -1,8 +1,8 @@
 [submodule "vim"]
     branch = master
 	path = vim
-	url = git@github.com:tnicolas42/timrc-vim
+	url = https://github.com/tnicolas42/timrc-vim
 [submodule "zsh"]
     branch = master
 	path = zsh
-	url = git@github.com:tnicolas42/timrc-zsh
+	url = https://github.com/tnicolas42/timrc-zsh
