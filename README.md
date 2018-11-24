@@ -27,14 +27,14 @@ sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/to
 
 Pour tout installer:
 ```bash
-git clone git@github.com:tnicolas42/timrc.git ~/.tim && cd ~/.tim && ./install.sh -v && source ~/.zshrc
+git clone https://github.com/tnicolas42/timrc ~/.tim && cd ~/.tim && ./install.sh -v && source ~/.zshrc
 ```
 
 Installation etapes par etapes:
 
 Cloner le repo git
 ```bash
-git clone git@github.com:tnicolas42/timrc.git ~/.tim
+git clone https://github.com/tnicolas42/timrc ~/.tim
 cd ~/.tim
 ```
 
