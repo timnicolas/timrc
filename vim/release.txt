@@ -1,0 +1,9 @@
+""" new features """
+file navigator (<c-o> <c-p>)
+python show docstring
+python create auto docstring
+create a way to create multiline comment
+add html comment
+add function to update repo github and to update local config
+
+""" bug """

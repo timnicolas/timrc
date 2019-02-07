@@ -29,6 +29,9 @@ Pour tout installer:
 ```bash
 git clone https://github.com/tnicolas42/timrc ~/.tim && cd ~/.tim && ./install.sh -v && source ~/.zshrc
 ```
+```bash
+git clone git@github.com:tnicolas42/timrc ~/.tim && cd ~/.tim && ./install.sh -v && source ~/.zshrc
+```
 
 Installation etapes par etapes:
 
