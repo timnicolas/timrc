@@ -20,7 +20,12 @@ sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/to
 ubuntu:
 ```bash
 sudo apt-get install zsh git vim
+# oh-my-zsh
 sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
+# vim 8
+sudo add-apt-repository ppa:jonathonf/vim
+sudo apt update
+sudo apt install vim
 ```
 
 ### Installation
