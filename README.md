@@ -1,4 +1,4 @@
-# timrc [![Build Status](https://travis-ci.org/tnicolas42/timrc.svg?branch=master)](https://travis-ci.org/tnicolas42/timrc)
+# timrc
 
 ## Insallation
 
