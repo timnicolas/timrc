@@ -2,7 +2,11 @@
 "min number of line around cursor
 let g:min_number_line_ar_cur = 4
 "color column (for max size line) 0 to off (example: 81 or 121)
-let g:max_size_line=121
+if (expand('%:e') == 'h' || expand('%:e') == 'c' || expand('%:e') == 'cpp')
+	let g:max_size_line=81
+else
+	let g:max_size_line=121
+endif
 "enable or diable mouse
 let g:enable_mouse=1
 "highlight search
