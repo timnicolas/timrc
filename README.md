@@ -9,17 +9,18 @@ Pour installer timrc vous devez avoir deja installe certains programmes:
 zsh
 git
 vim
+wget
 oh-my-zsh
 ```
 macos:
 ```bash
-brew install zsh git vim
+brew install zsh git vim wget
 sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 ```
 
 ubuntu:
 ```bash
-sudo apt-get install zsh git vim
+sudo apt-get install zsh git vim wget
 # oh-my-zsh
 sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 # vim 8
