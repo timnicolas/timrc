@@ -36,6 +36,10 @@ else
 fi
 alias zshrc="vim ~/.zshrc ~/.timrc $TIMRC_ZSH/timrc.zsh && source ~/.zshrc"
 
+# bindkey for use opt+right instead of ctrl+right
+bindkey "^[^[[C" forward-word
+bindkey "^[^[[D" backward-word
+
 # alias for xclip if it's installed
 if [ ! -z "`command -v xclip`" ]; then
 	alias c="xclip -selection clipboard"
