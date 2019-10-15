@@ -66,3 +66,6 @@ alias tmux2split='tmux new-session -s session -d && tmux split-window -t session
 alias :q='exit'
 alias :wq='exit'
 alias :wqa='exit'
+
+# alias to open vscode -> code <folder>
+alias code="/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code"
