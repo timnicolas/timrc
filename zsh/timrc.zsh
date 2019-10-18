@@ -69,3 +69,5 @@ alias :wqa='exit'
 
 # alias to open vscode -> code <folder>
 alias code="/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code"
+
+source "$TIMRC_ZSH/django.zsh"
