@@ -5,6 +5,7 @@ dj_initProjDir () {
 		"static/css"
 		"static/js"
 		"static/img"
+		"media"
 	)
 	for i in "${create[@]}"; do
 		echo "$i"
@@ -15,7 +16,7 @@ dj_initProjDir () {
 
 
 dj_initAppDir () {
-	create=(
+	createDir=(
 		"templates"
 		"templates/$1"
 		"static"
@@ -24,11 +25,17 @@ dj_initAppDir () {
 		"static/$1/js"
 		"static/$1/img"
 	)
-	for i in "${create[@]}"; do
+	createFiles=(
+		"urls.py"
+		"forms.py"
+	)
+	for i in "${createDir[@]}"; do
 		echo "$i"
 		mkdir ${i}
 		touch ${i}/.empty
 	done
-	echo "urls.py"
-	touch urls.py
+	for i in "${createFiles[@]}"; do
+		echo "$i"
+		touch ${i}
+	done
 }
