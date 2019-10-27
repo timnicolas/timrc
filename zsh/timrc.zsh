@@ -40,6 +40,9 @@ alias zshrc="vim ~/.zshrc ~/.timrc $TIMRC_ZSH/timrc.zsh && source ~/.zshrc"
 bindkey "^[^[[C" forward-word
 bindkey "^[^[[D" backward-word
 
+# tabs = 4 spaces
+tabs -4
+
 # alias for xclip if it's installed
 if [ ! -z "`command -v xclip`" ]; then
 	alias c="xclip -selection clipboard"
