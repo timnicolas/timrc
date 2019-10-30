@@ -1,6 +1,9 @@
 # source colors
 source "$TIMRC_ZSH/color.zsh"
 
+export LC_ALL=en_US.UTF-8
+export PATH=$PATH:/usr/local/Cellar/gettext/0.20.1/bin
+
 # theme for zsh
 # default theme "robbyrussell"
 ZSH_THEME="fino"
