@@ -77,7 +77,7 @@ alias :wqa='exit'
 alias code="/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code"
 
 # alias for cpp linter
-CPPLINT_RULES="--filter=-whitespace/tab,-legal/copyright --linelength=120"
+CPPLINT_RULES="--filter=-whitespace/tab,-legal/copyright,-build/c++11 --linelength=120"
 export CPPLINT="python3 $TIMRC/cpplint/cpplint.py $CPPLINT_RULES"
 alias cpplint="$CPPLINT"
 alias cpplint_allrules="python3 $TIMRC/cpplint/cpplint.py"
