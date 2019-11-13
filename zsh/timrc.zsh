@@ -78,8 +78,8 @@ alias code="/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/co
 
 # alias for cpp linter
 CPPLINT_RULES="--filter=-whitespace/tab,-legal/copyright,-build/c++11 --linelength=120"
-export CPPLINT="python3 $TIMRC/cpplint/cpplint.py $CPPLINT_RULES"
-alias cpplint="$CPPLINT"
-alias cpplint_allrules="python3 $TIMRC/cpplint/cpplint.py"
+export CPPLINT="python3 $TIMRC/cpplint/cpplint.py"
+alias cpplint="$CPPLINT $CPPLINT_RULES"
+alias cpplint_allrules="$CPPLINT"
 
 source "$TIMRC_ZSH/django.zsh"
