@@ -1,6 +1,12 @@
 # source colors
 source "$TIMRC_ZSH/color.zsh"
 
+# source linter file
+LINT_FILE="$TIMRC/cpplinter/alias.zsh"
+if [ -f $LINT_FILE ]; then
+	source $LINT_FILE
+fi
+
 export LC_ALL=en_US.UTF-8
 export PATH=$PATH:/usr/local/Cellar/gettext/0.20.1/bin
 
@@ -75,11 +81,5 @@ alias :wqa='exit'
 
 # alias to open vscode -> code <folder>
 alias code="/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code"
-
-# alias for cpp linter
-CPPLINT_RULES="--filter=-whitespace/tab,-legal/copyright,-build/c++11 --linelength=120"
-export CPPLINT="python3 $TIMRC/cpplint/cpplint.py $CPPLINT_RULES"
-alias cpplint="$CPPLINT"
-alias cpplint_allrules="python3 $TIMRC/cpplint/cpplint.py"
 
 source "$TIMRC_ZSH/django.zsh"

@@ -6,12 +6,14 @@ USAGE="./install.sh [-h|--help] [-v|--verbose] [--novim] [--nozsh]
  -> [-v|--verbose]: verbose mode
  -> [--novim]: dont install vim config
  -> [--nozsh]: dont install zsh config
+ -> [--nolint]: dont install cpplint
 "
 
 # arguments
 # https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
 ZSH=true
 VIM=true
+LINT=true
 VERBOSE=false
 
 # save args in variable
@@ -29,6 +31,10 @@ do
 		;;
 		--nozsh)
 		ZSH=false
+		shift # past argument
+		;;
+		--nolint)
+		LINT=false
 		shift # past argument
 		;;
 		-v|--verbose)
@@ -71,4 +77,10 @@ fi
 if $VIM; then
 	printf "${TITLE_S}install vim${TITLE_E}"
 	zsh vim/install_vim.sh $args
+fi
+
+# install linter
+if $LINT; then
+	printf "${TITLE_S}install cpplinter${TITLE_E}"
+	git clone git@github.com:tnicolas42/cpplinter
 fi
