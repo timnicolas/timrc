@@ -82,4 +82,9 @@ alias :wqa='exit'
 # alias to open vscode -> code <folder>
 alias code="/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code"
 
+# alias for leaks
+function whileLeaks () {
+	while [ 1 ]; do date > /tmp/.tmpleaks ; leaks $1 >> /tmp/.tmpleaks 2>&1 ; clear ; cat /tmp/.tmpleaks ; sleep 1 ; done
+}
+
 source "$TIMRC_ZSH/django.zsh"
