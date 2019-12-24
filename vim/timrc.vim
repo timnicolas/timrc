@@ -1,7 +1,7 @@
 """""""""""""""""""""""""""""""""""""mapleader""""""""""""""""""""""""""""""""""
 " set mapleader
 let mapleader = ","
-if has('terminal')
+if has('terminal') && has('macunix')
 	set termwinkey=<C-L>
 endif
 """""""""""""""""""""""""""""""""""""mapleader""""""""""""""""""""""""""""""""""
