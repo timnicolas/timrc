@@ -14,3 +14,5 @@ ssh-add -K ~/.ssh/id_rsa
 xclip -sel clip < ~/.ssh/id_rsa.pub
 
 echo "paste ssh key in github"
+
+echo "then run curl https://raw.githubusercontent.com/tnicolas42/timrc/master/installs/linux_install.sh | sh"

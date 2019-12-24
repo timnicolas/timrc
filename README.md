@@ -67,3 +67,14 @@ Ne pas installer la config vim
 ./install.sh --novim
 ```
 
+## Full installation linux
+
+```
+curl https://raw.githubusercontent.com/tnicolas42/timrc/master/installs/linux_first_install.sh | sh
+```
+
+add the ssh key
+
+```
+curl https://raw.githubusercontent.com/tnicolas42/timrc/master/installs/linux_install.sh | sh
+```
