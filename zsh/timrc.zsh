@@ -94,3 +94,5 @@ function whileLeaks () {
 }
 
 source "$TIMRC_ZSH/django.zsh"
+
+source "$HOME/.cargo/env"
