@@ -61,6 +61,8 @@ if [[ -z "`cat $HOME/.timrc | grep -E "source[[:space:]]*" | grep "$TIMRC_ZSH_FI
 	echo "source $TIMRC_ZSH_FILE" >> $HOME/.timrc
 fi
 
+cp $DIR/radare2rc ~/.radare2rc
+
 # install plugin zsh + oh-my-zsh
 printf "${TITLE_S}install oh-my-zsh plugins${TITLE_E}"
 if ! [ -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions" ]; then

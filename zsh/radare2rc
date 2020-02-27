@@ -1,0 +1,4 @@
+e asm.cmt.right = true  # show comment on disassembly
+e asm.pseudo = true  # pseudo code: mov eax, str.ok = > eax = str.ok
+e scr.utf8 = true  # Use UTF-8 to show cool arrows
+eco ayu  # theme

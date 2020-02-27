@@ -6,7 +6,6 @@ USAGE="./install.sh [-h|--help] [-v|--verbose] [--novim] [--nozsh]
  -> [-v|--verbose]: verbose mode
  -> [--novim]: dont install vim config
  -> [--nozsh]: dont install zsh config
- -> [--nolint]: dont install cpplint
 "
 
 # arguments
@@ -31,10 +30,6 @@ do
 		;;
 		--nozsh)
 		ZSH=false
-		shift # past argument
-		;;
-		--nolint)
-		LINT=false
 		shift # past argument
 		;;
 		-v|--verbose)
@@ -77,10 +72,4 @@ fi
 if $VIM; then
 	printf "${TITLE_S}install vim${TITLE_E}"
 	zsh vim/install_vim.sh $args
-fi
-
-# install linter
-if $LINT; then
-	printf "${TITLE_S}install cpplinter${TITLE_E}"
-	git clone git@github.com:tnicolas42/cpplinter
 fi
