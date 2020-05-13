@@ -84,13 +84,22 @@ alias code="/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/co
 
 # alias for leaks
 function whileLeaks () {
-	while [ 1 ]; do
-		date > /tmp/.tmpleaks
-		leaks $1 >> /tmp/.tmpleaks 2>&1
-		clear
-		cat /tmp/.tmpleaks
-		sleep 1
-	done
+	if [ $# -eq 2 ]; then
+		timeToSleep="$2"
+	else
+		timeToSleep="1"
+	fi
+	if [ $# -eq 0 ]; then
+		echo "usage: whileleaks <program-name> [sleep-time=1]"
+	else
+		while [ 1 ]; do
+			date > /tmp/.tmpleaks
+			leaks $1 >> /tmp/.tmpleaks 2>&1
+			clear
+			cat /tmp/.tmpleaks
+			sleep $timeToSleep
+		done
+	fi
 }
 
 source "$TIMRC_ZSH/django.zsh"
