@@ -74,3 +74,8 @@ if ! [ -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlightin
 	printf "${ADD_S}add plugin zsh-syntax-highlighting${ADD_E}" | eval $verbose
 	git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting | eval $verbose
 fi
+
+if ! [ -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-iterm-touchbar" ]; then
+	printf "${ADD_S}add plugin zsh-iterm-touchbar${ADD_E}" | eval $verbose
+	git clone https://github.com/iam4x/zsh-iterm-touchbar.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-iterm-touchbar | eval $verbose
+fi

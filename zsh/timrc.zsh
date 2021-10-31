@@ -8,7 +8,7 @@ if [ -f $LINT_FILE ]; then
 fi
 
 export LC_ALL=en_US.UTF-8
-export PATH=$PATH:/usr/local/Cellar/gettext/0.20.1/bin
+export PATH=$PATH:/usr/local/Cellar/gettext/0.20.1/bin:/opt/homebrew/bin
 
 # theme for zsh
 # default theme "robbyrussell"
@@ -21,6 +21,7 @@ plugins=(
 		zsh-autosuggestions
 		z
 		colored-man-pages
+		zsh-iterm-touchbar
 		zsh-syntax-highlighting # must be the last plugin
 	)
 source $ZSH/oh-my-zsh.sh
@@ -101,6 +102,15 @@ function whileLeaks () {
 		done
 	fi
 }
+
+# touchbar
+TOUCHBAR_GIT_ENABLED=true
+GIT_UNCOMMITTED="+"
+GIT_UNSTAGED="!"
+GIT_UNTRACKED="?"
+GIT_STASHED="$"
+GIT_UNPULLED="⇣"
+GIT_UNPUSHED="⇡"
 
 source "$TIMRC_ZSH/django.zsh"
 
