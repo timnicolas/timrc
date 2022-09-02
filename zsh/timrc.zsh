@@ -26,6 +26,8 @@ plugins=(
 	)
 source $ZSH/oh-my-zsh.sh
 
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+
 # use xterm-256color
 export TERM=xterm-256color
 # use vim in git (default editor for commit)
