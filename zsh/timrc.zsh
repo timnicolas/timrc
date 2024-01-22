@@ -27,6 +27,7 @@ plugins=(
 source $ZSH/oh-my-zsh.sh
 
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+DISABLE_UPDATE_PROMPT=true
 
 # use xterm-256color
 export TERM=xterm-256color
