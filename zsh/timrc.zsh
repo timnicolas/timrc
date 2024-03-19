@@ -24,10 +24,13 @@ plugins=(
 		zsh-iterm-touchbar
 		zsh-syntax-highlighting # must be the last plugin
 	)
+
+DISABLE_UPDATE_PROMPT=true  # auto update ohmyzsh
+# DISABLE_AUTO_UPDATE=true  # never update ohmyzsh
+
 source $ZSH/oh-my-zsh.sh
 
 ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-DISABLE_UPDATE_PROMPT=true
 
 # use xterm-256color
 export TERM=xterm-256color
