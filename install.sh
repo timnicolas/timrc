@@ -1,17 +1,21 @@
 #!/bin/zsh
 
 # usage
-USAGE="./install.sh [-h|--help] [-v|--verbose] [--novim] [--nozsh]
+USAGE="./install.sh [-h|--help] [-v|--verbose] [--novim] [--nozsh] [--notmux] [--nonvim]
  -> [-h|--help]: print usage
  -> [-v|--verbose]: verbose mode
  -> [--novim]: dont install vim config
  -> [--nozsh]: dont install zsh config
+ -> [--notmux]: dont install tmux config
+ -> [--nonvim]: dont install nvim config
 "
 
 # arguments
 # https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
 ZSH=true
 VIM=true
+TMUX=true
+NVIM=true
 LINT=true
 VERBOSE=false
 
@@ -30,6 +34,14 @@ do
 		;;
 		--nozsh)
 		ZSH=false
+		shift # past argument
+		;;
+		--notmux)
+		TMUX=false
+		shift # past argument
+		;;
+		--nonvim)
+		NVIM=false
 		shift # past argument
 		;;
 		-v|--verbose)
@@ -72,4 +84,16 @@ fi
 if $VIM; then
 	printf "${TITLE_S}install vim${TITLE_E}"
 	zsh vim/install_vim.sh $args
+fi
+
+# install nvim
+if $NVIM; then
+	printf "${TITLE_S}install nvim${TITLE_E}"
+	zsh nvim/install_nvim.sh $args
+fi
+
+# install tmux
+if $TMUX; then
+	printf "${TITLE_S}install tmux${TITLE_E}"
+	zsh tmux/install_tmux.sh $args
 fi

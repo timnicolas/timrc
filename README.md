@@ -9,19 +9,24 @@ Pour installer timrc vous devez avoir deja installe certains programmes:
 zsh
 git
 vim
+neovim
+tmux
 wget
 oh-my-zsh
+btop
+un nerd font (ex. JetBrainsMono Nerd Font, https://www.nerdfonts.com), a activer dans le terminal
 ```
 macos:
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-brew install zsh git vim wget
+brew install zsh git vim neovim tmux wget btop
+brew install --cask font-jetbrains-mono-nerd-font
 sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 ```
 
 ubuntu:
 ```bash
-sudo apt-get install zsh git vim wget
+sudo apt-get install zsh git vim neovim tmux wget btop
 # oh-my-zsh
 sh -c "$(wget https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh -O -)"
 # vim 8
@@ -66,6 +71,16 @@ Ne pas installer la config zsh
 Ne pas installer la config vim
 ```bash
 ./install.sh --novim
+```
+
+Ne pas installer la config nvim
+```bash
+./install.sh --nonvim
+```
+
+Ne pas installer la config tmux
+```bash
+./install.sh --notmux
 ```
 
 ## Full installation linux
