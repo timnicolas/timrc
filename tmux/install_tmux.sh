@@ -74,3 +74,13 @@ fi
 
 # headless install, does not need a running tmux server (see tpm/bin/install_plugins)
 "$TPM_DIR/bin/install_plugins" | eval $verbose
+
+# tasks.sh: plugin custom tmux2k (compte des tâches todo.txt en barre de statut) — pas un plugin TPM,
+# vit dans le clone tmux2k donc écrasé par une réinstallation ; on le recopie depuis ce repo à
+# chaque install
+TMUX2K_DIR="$HOME/.tmux/plugins/tmux2k"
+if [ -d "$TMUX2K_DIR/plugins" ]; then
+	printf "${TITLE_S}install tasks.sh (tmux2k custom plugin)${TITLE_E}"
+	cp "$DIR/tasks.sh" "$TMUX2K_DIR/plugins/tasks.sh"
+	chmod +x "$TMUX2K_DIR/plugins/tasks.sh"
+fi
