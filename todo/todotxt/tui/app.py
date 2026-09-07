@@ -4,27 +4,35 @@ from pathlib import Path
 
 import urwid
 
-from todotxt import settings
+from todotxt import colors, settings
 from todotxt.config import PALETTE, PRIORITY_LEVELS, SYNC_INTERVAL
 from todotxt.model import NO_PROJECT, PROJECT_SEPARATOR, Task, cycle_priority
 from todotxt.store import TaskNotFound, TodoStore
+from todotxt.tui import palette
 from todotxt.tui.detail import DetailPane, rebuilt_description
-from todotxt.tui.dialogs import ConfirmDialog, PromptDialog, TaskDialog
+from todotxt.tui.dialogs import ColorPromptDialog, ConfirmDialog, PromptDialog, TaskDialog
 from todotxt.tui.footer import Footer
 from todotxt.tui.help import HelpOverlay
 from todotxt.tui.keys import disable_extended_keys, enable_extended_keys, patch_input_sequences
+from todotxt.tui.settings_menu import LABELS, PREFIX, SettingsOverlay
 from todotxt.tui.tasklist import TaskList, section_key, task_key
-from todotxt.view import SortMode, ViewState, build_sections
+from todotxt.tui.title import restore_title, set_title
+from todotxt.view import Query, SortMode, ViewState, build_sections
 
 DIALOG_WIDTH = ("relative", 70)
 HELP_WIDTH = ("relative", 50)
+# Given, not packed: the table is taller than a short terminal and scrolls inside the box
+HELP_HEIGHT = ("relative", 80)
+MENU_WIDTH = ("relative", 45)
+MENU_HEIGHT = ("relative", 60)
+MIN_MODAL_HEIGHT = 8
 MIN_DIALOG_WIDTH = 30
 MAX_PATH_WIDTH = 40
 TRUECOLOR = 2**24
 REORDER_HINT = "Reordering only works in file order — press s"
 NO_PROJECT_QUESTION = "This task carries no project. Add it anyway?"
 DETAIL_HIDDEN_HINT = "The detail pane is hidden — press D"
-DETAIL_EDIT_HINT = "Editing the body — enter saves, shift+enter breaks the line, esc cancels"
+DETAIL_EDIT_HINT = "Editing the body — tab saves, enter breaks the line, esc cancels"
 
 # Rows the search box and the status bar take out of the screen, around the body
 SEARCH_ROWS = 3
@@ -34,33 +42,36 @@ FOOTER_ROWS = 1
 MIN_LIST_ROWS = 5
 
 
-def run(store: TodoStore, path: Path | None = None) -> None:
-    """Start the TUI on `store`.
+def run(store: TodoStore, path: Path | None = None, search: str = "") -> None:
+    """Start the TUI on `store`, filtered by `search` if one is given.
 
     `path` is only used to label the status bar and defaults to the store's own todo file.
     The terminal is asked for extended key reporting, and given it back whatever happens next.
     """
     patch_input_sequences()
     enable_extended_keys()
+    set_title(search)
     try:
-        TodoApp(store, path).run()
+        TodoApp(store, path, search).run()
     finally:
         disable_extended_keys()
+        restore_title()
 
 
 class TodoApp:
     """The whole application: task list, footer, modals and the file-change poll."""
 
-    def __init__(self, store: TodoStore, path: Path | None = None):
+    def __init__(self, store: TodoStore, path: Path | None = None, search: str = ""):
         self.store = store
         self.path = Path(path) if path else store.todo_path
         self.state = ViewState()
         settings.load_into(self.state)
+        self.state.search = search
         self.tasks: list[Task] = []
         self.list = TaskList()
         urwid.connect_signal(self.list.body, "modified", self._update_detail)
         self.footer = Footer()
-        self.search = urwid.Edit(("completed", " / "), "")
+        self.search = urwid.Edit(("completed", " / "), search)
         urwid.connect_signal(self.search, "change", self._on_search_change)
         # Drawn in the same muted grey as completed tasks: always available, never in the way
         # No bottom line: the box below supplies the single line the two of them share
@@ -71,6 +82,7 @@ class TodoApp:
         self.detail = DetailPane(
             on_edit_request=self._begin_detail_edit,
             on_accept=self._accept_detail_edit,
+            on_next=self._leave_detail_for_search,
             on_cancel=self._end_detail_edit,
         )
         self.body = urwid.Pile([self.list_box])
@@ -85,6 +97,8 @@ class TodoApp:
         self._actions = {
             "q": self._quit,
             " ": self._toggle_fold,
+            "right": lambda: self._set_fold(False),
+            "left": lambda: self._set_fold(True),
             "enter": self._toggle_fold,
             "n": self._add_task,
             "e": self._edit_task,
@@ -101,40 +115,51 @@ class TodoApp:
             "c": self._toggle_completed,
             "C": self._toggle_confirm,
             "D": self._toggle_detail,
-            "+": lambda: self._resize_detail(1),
+            "+": self._add_task_in_project,
+            "=": lambda: self._resize_detail(1),
             "-": lambda: self._resize_detail(-1),
+            "tab": self._focus_next_section,
             "/": self._start_search,
+            ",": self._show_settings,
             "r": self._refresh,
             "?": self._show_help,
         }
 
     def run(self) -> None:
         """Load the file and enter the urwid main loop."""
+        # The palette holds 24-bit colors: without this urwid rounds them to its 256-color set
+        self.loop.screen.set_terminal_properties(colors=TRUECOLOR)
+        palette.bind(self.loop.screen)
         self._reload()
         self.list.focus_first_task()
         self._apply_detail_layout()
         self._update_detail()
-        # The palette holds 24-bit colors: without this urwid rounds them to its 256-color set
-        self.loop.screen.set_terminal_properties(colors=TRUECOLOR)
         self.loop.set_alarm_in(SYNC_INTERVAL, self._sync)
         self.loop.run()
 
     def _dispatch(self, key: str) -> None:
         """Route a key the list box did not use to the action it is bound to."""
-        if self._modal is not None or self.detail.editing:
+        if self._modal is not None:
+            return
+        self._message = ""
+        # A click in the list moves the focus out of the pane without leaving edit mode, and the
+        # pane then receives nothing: recover here rather than swallow every key from now on
+        if self.detail.editing and not self._detail_focused():
+            self._commit_detail_edit()
+        if self.detail.editing:
             return
         if self.frame.focus_position == "header":
             self._search_key(key)
             return
 
-        self._message = ""
         action = self._actions.get(key)
         if action:
             action()
         self._update_status()
 
     def _quit(self) -> None:
-        """Leave the application."""
+        """Leave the application, saving an edit in progress on the way out."""
+        self._commit_detail_edit()
         raise urwid.ExitMainLoop()
 
     def _toggle_fold(self) -> None:
@@ -146,6 +171,18 @@ class TodoApp:
             return
         section = self.list.focused_header
         if section is None:
+            return
+        self.state.toggle_fold(section)
+        self._render()
+        self.list.restore_focus(section_key(section), section, self.list.position)
+
+    def _set_fold(self, collapsed: bool) -> None:
+        """Fold or unfold the section under the cursor, whichever way the arrow points.
+
+        Inert on a task: the arrows only mean anything on a project heading.
+        """
+        section = self.list.focused_header
+        if section is None or self.state.is_collapsed(section) == collapsed:
             return
         self.state.toggle_fold(section)
         self._render()
@@ -175,8 +212,20 @@ class TodoApp:
             self._reload(focus_key=task_key(updated), fallback_section=section)
 
     def _add_task(self) -> None:
-        """Open an empty task dialog and append what it returns."""
-        self._open_new_dialog("")
+        """Open the add dialog, already filed under the project the view is filtered on."""
+        self._open_new_dialog(self._filtered_project_prefix())
+
+    def _add_task_in_project(self) -> None:
+        """Open the add dialog on a project: the filtered one, or a '+' offering the whole list."""
+        self._open_new_dialog(self._filtered_project_prefix() or "+")
+
+    def _filtered_project_prefix(self) -> str:
+        """'+project ' when the view is filtered on exactly one project, empty otherwise.
+
+        Filtering on several projects says nothing about which one a new task belongs to.
+        """
+        projects = Query.parse(self.state.search).projects
+        return f"+{projects[0]} " if len(projects) == 1 else ""
 
     def _open_new_dialog(self, text: str) -> None:
         """Open the add dialog on `text`, which a refused confirmation gives back to be fixed."""
@@ -250,8 +299,49 @@ class TodoApp:
         if self._write(lambda: self.store.update(updated)):
             self._reload(focus_key=task_key(updated), fallback_section=section)
 
+    def _rename_from_settings(self, kind: str, name: str) -> None:
+        """Ask for a new name for a project or a tag, then come back to the menu."""
+        self._close_modal()
+        self._open_modal(
+            PromptDialog(
+                f"Rename {LABELS[kind]}",
+                "New name:",
+                name,
+                on_accept=lambda text: self._accept_settings_rename(kind, name, text),
+                on_cancel=lambda: self._show_settings((kind, name)),
+            )
+        )
+
+    def _accept_settings_rename(self, kind: str, old: str, text: str) -> None:
+        """Rename a project or a tag across the file, its color following, then reopen the menu.
+
+        An empty or unchanged name is a cancel; the menu comes back on the line that was edited,
+        under whichever name it goes by now.
+        """
+        self._close_modal()
+        new = _prefixed(kind, text)
+        if not new or new == old:
+            self._show_settings((kind, old))
+            return
+        if len(new.split()) > 1:
+            self._notify(f"A {LABELS[kind]} name cannot contain spaces")
+            self._show_settings((kind, old))
+            return
+        rename = self.store.rename_project if kind == colors.PROJECT else self.store.rename_context
+        count = rename(old, new)
+        if not count:
+            self._notify(f"No task carries {old} any more")
+            self._reload()
+            self._show_settings((kind, old))
+            return
+        palette.rename(kind, old, new)
+        self._follow_renamed(kind, old, new)
+        self._notify(f"Renamed {old} to {new} in {count} task(s)")
+        self._reload()
+        self._show_settings((kind, new))
+
     def _rename_project(self) -> None:
-        """Open a rename dialog on the focused project heading."""
+        """Open the dialog renaming the focused project heading and choosing its color."""
         section = self.list.focused_header
         if section is None:
             return
@@ -259,39 +349,75 @@ class TodoApp:
             self._notify("Tasks with no project cannot be renamed")
             return
         self._open_modal(
-            PromptDialog(
+            ColorPromptDialog(
                 "Rename project",
                 "New name:",
                 section,
-                on_accept=lambda text: self._accept_rename(section, text),
+                f"Color of +{colors.root(colors.PROJECT, section)}:",
+                palette.color_of(colors.PROJECT, section),
+                on_accept=lambda text, color: self._accept_rename(section, text, color),
                 on_cancel=self._close_modal,
             )
         )
 
-    def _accept_rename(self, old: str, text: str) -> None:
-        """Rename a project across the whole file, an empty or unchanged name being a cancel."""
+    def _accept_rename(self, old: str, text: str, color: str) -> None:
+        """Store the chosen color, and rename the project across the file when the name changed.
+
+        An empty name is a cancel; an unchanged one still applies the color that was picked.
+        """
         self._close_modal()
-        new = text.strip().lstrip("+")
-        if not new or f"+{new}" == old:
+        new = _prefixed(colors.PROJECT, text)
+        if not new:
             return
         if len(new.split()) > 1:
             self._notify("A project name cannot contain spaces")
             return
-        count = self.store.rename_project(old, f"+{new}")
+        if new == old:
+            self._store_color(old, color)
+            return
+        count = self.store.rename_project(old, new)
         if not count:
             self._notify(f"No task carries {old} any more")
             self._reload()
             return
-        self._follow_renamed_project(old, f"+{new}")
-        self._reload(focus_key=section_key(f"+{new}"), fallback_section=f"+{new}")
-        self._notify(f"Renamed {old} to +{new} in {count} task(s)")
+        palette.rename(colors.PROJECT, old, new)
+        self._store_color(new, color)
+        self._follow_renamed(colors.PROJECT, old, new)
+        self._reload(focus_key=section_key(new), fallback_section=new)
+        self._notify(f"Renamed {old} to {new} in {count} task(s)")
 
-    def _follow_renamed_project(self, old: str, new: str) -> None:
-        """Carry folds and open bodies over to the new name, so nothing folds at random."""
-        self.state.collapsed = {_renamed_section(name, old, new) for name in self.state.collapsed}
-        self.state.expanded = {
-            Task.parse(line).with_project_renamed(old, new).to_line() for line in self.state.expanded
-        }
+    def _store_color(self, project: str, color: str) -> None:
+        """Remember the color picked for a project, unless it is the one it already had."""
+        if color != palette.color_of(colors.PROJECT, project):
+            palette.set_color(colors.PROJECT, project, color)
+
+    def _show_settings(self, focus: tuple[str, str] | None = None) -> None:
+        """Open the menu listing every project and tag, to rename or recolor them.
+
+        It is built from a fresh read of the file, so a rename made from it is reflected when it
+        comes back; `focus` is the line the cursor should land on.
+        """
+        self._open_modal(
+            SettingsOverlay(
+                self.store.projects(),
+                self.store.contexts(),
+                self._close_modal,
+                self._rename_from_settings,
+                focus=focus,
+            ),
+            width=MENU_WIDTH,
+            height=MENU_HEIGHT,
+        )
+
+    def _follow_renamed(self, kind: str, old: str, new: str) -> None:
+        """Carry folds and open bodies over to the new name, so nothing folds at random.
+
+        Only a project has sections to fold; both kinds appear in the lines an expanded body is
+        remembered by, which is why those are rewritten either way.
+        """
+        if kind == colors.PROJECT:
+            self.state.collapsed = {_renamed_section(name, old, new) for name in self.state.collapsed}
+        self.state.expanded = {_renamed_line(kind, line, old, new) for line in self.state.expanded}
 
     def _delete_task(self) -> None:
         """Ask for confirmation before removing the focused task."""
@@ -348,6 +474,7 @@ class TodoApp:
 
     def _toggle_detail(self) -> None:
         """Show or hide the pane describing the focused row under the list."""
+        self._commit_detail_edit()
         self.state.detail_visible = not self.state.detail_visible
         self._end_detail_edit()
         self._save_settings()
@@ -385,9 +512,18 @@ class TodoApp:
         rows = self.loop.screen.get_cols_rows()[1] - SEARCH_ROWS - FOOTER_ROWS - MIN_LIST_ROWS
         return max(settings.MIN_DETAIL_HEIGHT, rows)
 
-    def _begin_detail_edit(self) -> bool:
+    def _commit_detail_edit(self) -> None:
+        """Save what the detail pane holds before leaving it. Only esc throws an edit away."""
+        if self.detail.editing:
+            self._accept_detail_edit(self.detail.task, self.detail.edit_text)
+
+    def _detail_focused(self) -> bool:
+        """Whether the detail pane really holds the focus, and not just the editing flag."""
+        return self.state.detail_visible and len(self.body.contents) > 1 and self.body.focus_position == 1
+
+    def _begin_detail_edit(self, at_end: bool = True) -> bool:
         """Put the pane into edit mode and hand it the focus. False when it shows no task."""
-        if self._modal is not None or not self.state.detail_visible or not self.detail.begin_edit():
+        if self._modal is not None or not self.state.detail_visible or not self.detail.begin_edit(at_end):
             return False
         self.body.focus_position = 1
         self._notify(DETAIL_EDIT_HINT)
@@ -462,7 +598,18 @@ class TodoApp:
 
     def _show_help(self) -> None:
         """Open the keybinding reference."""
-        self._open_modal(HelpOverlay(self._close_modal), width=HELP_WIDTH)
+        self._open_modal(HelpOverlay(self._close_modal), width=HELP_WIDTH, height=HELP_HEIGHT)
+
+    def _focus_next_section(self) -> None:
+        """Move the focus on to the next section: list, then detail pane, then search."""
+        if self.state.detail_visible and self._begin_detail_edit():
+            return
+        self._start_search()
+
+    def _leave_detail_for_search(self, task: Task, text: str) -> None:
+        """Save what the pane holds, the way enter does, then carry the focus to the search."""
+        self._accept_detail_edit(task, text)
+        self._start_search()
 
     def _start_search(self) -> None:
         """Send the focus to the always-visible search field, which filters as the query is typed."""
@@ -470,8 +617,8 @@ class TodoApp:
         self.search.set_edit_pos(len(self.search.edit_text))
 
     def _search_key(self, key: str) -> None:
-        """Enter keeps the query, esc drops it; the list itself follows every keystroke."""
-        if key not in ("enter", "esc"):
+        """Enter and tab keep the query, esc drops it; the list follows every keystroke."""
+        if key not in ("enter", "esc", "tab"):
             return
         if key == "esc":
             self.search.set_edit_text("")
@@ -480,6 +627,7 @@ class TodoApp:
     def _on_search_change(self, _widget: urwid.Edit, text: str) -> None:
         """Filter the list on every keystroke of the search field."""
         self.state.search = text
+        set_title(text)
         self._render()
 
     def _end_search(self) -> None:
@@ -525,10 +673,20 @@ class TodoApp:
             fallback_section = row.section
         position = self.list.position
         self.tasks = self.store.load()
+        self._register_colors()
         self.state.keep_expanded({task.to_line() for task in self.tasks})
         self._mtime = self.store.mtime()
         self._render()
         self.list.restore_focus(focus_key, fallback_section, position)
+
+    def _register_colors(self) -> None:
+        """Give every project and tag of the file a palette entry, before any row is built.
+
+        Registering the whole file rather than waiting for a word to be drawn is what lets a
+        focused row keep these colors: its focus map is read when the row is created.
+        """
+        palette.register(colors.PROJECT, [f"+{name}" for task in self.tasks for name in task.projects])
+        palette.register(colors.CONTEXT, [f"@{name}" for task in self.tasks for name in task.contexts])
 
     def _refresh_view(self) -> None:
         """Redraw the list after a view-only change, leaving the cursor where it was."""
@@ -589,11 +747,12 @@ class TodoApp:
             return False
         return True
 
-    def _open_modal(self, widget: urwid.Widget, width=DIALOG_WIDTH) -> None:
+    def _open_modal(self, widget: urwid.Widget, width=DIALOG_WIDTH, height="pack") -> None:
         """Show a dialog centered over the task list."""
         self._modal = widget
         self.loop.widget = urwid.Overlay(
-            widget, self.frame, "center", width, "middle", "pack", min_width=MIN_DIALOG_WIDTH
+            widget, self.frame, "center", width, "middle", height,
+            min_width=MIN_DIALOG_WIDTH, min_height=MIN_MODAL_HEIGHT,
         )
 
     def _close_modal(self) -> None:
@@ -607,6 +766,21 @@ class TodoApp:
             self._reload()
             self._notify("File changed on disk — reloaded")
         self.loop.set_alarm_in(SYNC_INTERVAL, self._sync)
+
+
+def _prefixed(kind: str, text: str) -> str:
+    """A name typed in a rename field, carrying the marker of its kind and nothing else."""
+    bare = text.strip().lstrip(PREFIX[kind])
+    return f"{PREFIX[kind]}{bare}" if bare else ""
+
+
+def _renamed_line(kind: str, line: str, old: str, new: str) -> str:
+    """A remembered task line once `old` has been renamed to `new`, project or tag alike."""
+    task = Task.parse(line)
+    renamed = (
+        task.with_project_renamed(old, new) if kind == colors.PROJECT else task.with_context_renamed(old, new)
+    )
+    return renamed.to_line()
 
 
 def _renamed_section(name: str, old: str, new: str) -> str:

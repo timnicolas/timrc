@@ -11,14 +11,16 @@ edited here; 'e' still opens the task dialog for it.
 
 import urwid
 
+from todotxt import colors
 from todotxt.model import CONTEXT_RE, NEWLINE, NO_PROJECT, PROJECT_RE, TAG_RE, Task, description_words
-from todotxt.tui.dialogs import to_marker
-from todotxt.tui.render import body_line_markup, detail_header_markup
+from todotxt.tui import palette
+from todotxt.tui.dialogs import HighlightedEdit, move_to_line_edge, to_marker
+from todotxt.tui.render import body_line_markup, detail_header_markup, section_counter_markup
 from todotxt.tui.tasklist import Row, SectionRow, TaskRow
 from todotxt.view import Section
 
 TITLE = "detail"
-EDIT_TITLE = "detail · enter saves · shift+enter breaks the line · esc cancels"
+EDIT_TITLE = "detail · tab saves · enter breaks the line · esc cancels"
 
 # Row the metadata line is drawn on: right under the top border of the box
 HEADER_ROW = 1
@@ -46,18 +48,39 @@ def rebuilt_description(task: Task, text: str) -> str:
     return NEWLINE.join(lines)
 
 
+class BodyEdit(HighlightedEdit):
+    """Edit field that can keep its caret where it was put.
+
+    A list box moves the caret of the widget it gives the focus to when it renders it, which
+    would undo a deliberate `set_edit_pos`. The lock is consumed by that first move, so a later
+    click still places the caret where it landed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.keep_caret = False
+
+    def move_cursor_to_coords(self, size, x, y) -> bool:
+        """Ignore one move, when the caret was placed on purpose just before."""
+        if self.keep_caret:
+            self.keep_caret = False
+            return True
+        return super().move_cursor_to_coords(size, x, y)
+
+
 class DetailPane(urwid.WidgetWrap):
     """Box under the list showing the metadata and the body of a task, editable in place."""
 
-    def __init__(self, on_edit_request, on_accept, on_cancel):
+    def __init__(self, on_edit_request, on_accept, on_cancel, on_next):
         self._on_edit_request = on_edit_request
         self._on_accept = on_accept
+        self._on_next = on_next
         self._on_cancel = on_cancel
         self._row: Row | None = None
         self._editing = False
         self._header = urwid.Text("", wrap="space")
         self._body = urwid.Text("", wrap="space")
-        self._edit = urwid.Edit(multiline=True, wrap="space")
+        self._edit = BodyEdit(multiline=True, wrap="space")
         # Padded so the field sits exactly where the read-only body was drawn, and does not jump
         self._field = urwid.Padding(self._edit, left=1)
         self._walker = urwid.SimpleListWalker([self._header, self._body])
@@ -102,15 +125,26 @@ class DetailPane(urwid.WidgetWrap):
             self._header.set_text(("dim", " Nothing selected."))
             self._body.set_text("")
 
-    def begin_edit(self) -> bool:
-        """Turn the body into an edit field. False when the pane shows no task to edit."""
+    @property
+    def edit_text(self) -> str:
+        """What the edit field currently holds, so a caller can save it before leaving."""
+        return self._edit.edit_text
+
+    def begin_edit(self, at_end: bool = True) -> bool:
+        """Turn the body into an edit field. False when the pane shows no task to edit.
+
+        `at_end` puts the caret after the text and holds it there; a click passes False and
+        places the caret itself.
+        """
         task = self.task
         if self._editing or task is None:
             return False
         self._edit.set_edit_text("\n".join(content_lines(task)))
-        self._edit.set_edit_pos(len(self._edit.edit_text))
         self._walker[1] = self._field
         self._listing.set_focus(1)
+        if at_end:
+            self._edit.set_edit_pos(len(self._edit.edit_text))
+            self._edit.keep_caret = True
         self._editing = True
         self._box.set_title(EDIT_TITLE)
         return True
@@ -126,24 +160,31 @@ class DetailPane(urwid.WidgetWrap):
         self.update(self._row)
 
     def keypress(self, size, key: str) -> str | None:
-        """Enter saves, shift+enter breaks the line, esc drops the edit; the rest is typed in."""
+        """Tab saves and moves on, enter breaks the line, esc drops the edit.
+
+        The body is prose written over several lines, so enter belongs to the text; leaving the
+        pane by any other route than esc is what saves it.
+        """
         if not self._editing:
             return key
-        if key == "enter":
-            self._on_accept(self.task, self._edit.edit_text)
+        if key == "tab":
+            self._on_next(self.task, self._edit.edit_text)
             return None
-        if key == "shift enter":
+        if key in ("enter", "shift enter"):
             self._edit.insert_text("\n")
             return None
         if key == "esc":
             self._on_cancel()
+            return None
+        if key in ("ctrl a", "ctrl e"):
+            move_to_line_edge(self._edit, key == "ctrl e")
             return None
         return super().keypress(size, key)
 
     def mouse_event(self, size, event: str, button: int, col: int, row: int, focus: bool) -> bool | None:
         """A click in the body starts an edit; the borders and the metadata line are left alone."""
         if not self._editing and event.endswith("mouse press") and button == 1:
-            if row < self._body_row(size) or not self._on_edit_request():
+            if row < self._body_row(size) or not self._on_edit_request(at_end=False):
                 return False
             focus = True
         return super().mouse_event(size, event, button, col, row, focus)
@@ -178,11 +219,12 @@ def _is_metadata(word: str) -> bool:
 
 def _section_meta(section: Section) -> list:
     """The heading line of the pane when a project heading is focused."""
-    return [("section", f" {section.label}"), ("dim", f"  {section.subtree_open} open / {section.subtree_total}")]
+    attr = "section" if section.name == NO_PROJECT else palette.bold_attr_for(colors.PROJECT, section.name, "section")
+    return [(attr, f" {section.label}"), *section_counter_markup(section)]
 
 
 def _section_hint(name: str) -> str:
     """What the pane offers under a project heading."""
     if name == NO_PROJECT:
         return " Tasks filed under no project."
-    return " Press e to rename this project and its sub-projects."
+    return " Press e to rename this project and its sub-projects, or to change its color."

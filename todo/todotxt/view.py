@@ -3,7 +3,17 @@
 from dataclasses import dataclass, field
 from enum import Enum
 
-from todotxt.model import NO_PROJECT, Task, project_ancestors, project_path
+from todotxt.model import (
+    CONTEXT_RE,
+    NO_PROJECT,
+    PRIORITY_RE,
+    PROJECT_RE,
+    PROJECT_SEPARATOR,
+    TAG_RE,
+    Task,
+    project_ancestors,
+    project_path,
+)
 
 
 class SortMode(str, Enum):
@@ -104,9 +114,68 @@ class Section:
         return sum(1 for task in self.tasks if not task.completed)
 
 
+@dataclass(frozen=True)
+class Query:
+    """A parsed filter query.
+
+    Terms of the same kind are OR'd and the kinds are AND'd, so "+a +b @home" reads as "in
+    project a or b, and carrying the @home context". A project also matches its sub-projects,
+    so "+phyling" covers "+phyling.firmware". Anything else is a plain substring of the line,
+    and every such word has to match.
+    """
+
+    projects: tuple[str, ...] = ()
+    contexts: tuple[str, ...] = ()
+    priorities: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
+    words: tuple[str, ...] = ()
+
+    @classmethod
+    def parse(cls, text: str) -> "Query":
+        """Read a query out of the words of a search string."""
+        projects, contexts, priorities, tags, words = [], [], [], [], []
+        for word in text.split():
+            lowered = word.lower()
+            if PRIORITY_RE.match(word):
+                priorities.append(word[1].upper())
+            elif PROJECT_RE.match(word):
+                projects.append(lowered.lstrip("+"))
+            elif CONTEXT_RE.match(word):
+                contexts.append(lowered.lstrip("@"))
+            elif TAG_RE.match(word):
+                tags.append(lowered)
+            else:
+                words.append(lowered)
+        return cls(tuple(projects), tuple(contexts), tuple(priorities), tuple(tags), tuple(words))
+
+    @property
+    def is_empty(self) -> bool:
+        """Whether the query filters nothing out."""
+        return not (self.projects or self.contexts or self.priorities or self.tags or self.words)
+
+    def matches(self, task: Task) -> bool:
+        """Whether a task satisfies every kind of term this query carries."""
+        line = task.to_line().lower()
+        task_projects = [project.lower() for project in task.projects]
+        task_tags = [f"{key}:{value}".lower() for key, value in task.tags]
+        return (
+            all(word in line for word in self.words)
+            and (not self.projects or any(_under(project, wanted) for project in task_projects
+                                          for wanted in self.projects))
+            and (not self.contexts or any(context.lower() in self.contexts for context in task.contexts))
+            and (not self.priorities or task.priority in self.priorities)
+            and (not self.tags or any(tag in self.tags for tag in task_tags))
+        )
+
+
+def _under(project: str, wanted: str) -> bool:
+    """Whether `project` is `wanted` or one of its sub-projects."""
+    return project == wanted or project.startswith(f"{wanted}{PROJECT_SEPARATOR}")
+
+
 def matches(task: Task, search: str) -> bool:
-    """Whether a task matches a search query, case-insensitively."""
-    return search.lower() in task.to_line().lower()
+    """Whether a task matches a search query."""
+    return Query.parse(search).matches(task)
 
 
 def sort_key(task: Task, mode: SortMode) -> tuple:
@@ -128,9 +197,9 @@ def build_sections(tasks: list[Task], state: ViewState) -> list[Section]:
     Sections are ordered by their project path, so '+a' is immediately followed by '+a.b'. A
     parent that holds no task of its own is still created when one of its sub-projects exists.
     """
-    visible = [
-        task for task in tasks if (state.show_completed or not task.completed) and matches(task, state.search)
-    ]
+    query = Query.parse(state.search)
+    selected = [task for task in tasks if query.matches(task)]
+    visible = [task for task in selected if state.show_completed or not task.completed]
 
     grouped: dict[str, list[Task]] = {}
     for task in visible:
@@ -143,12 +212,24 @@ def build_sections(tasks: list[Task], state: ViewState) -> list[Section]:
         Section(name, sorted(grouped[name], key=lambda task: sort_key(task, state.sort)), len(project_path(name)) - 1)
         for name in ordered
     ]
-    _count_subtrees(sections, grouped)
+    _count_subtrees(sections, _group(selected))
     return sections
 
 
+def _group(tasks: list[Task]) -> dict[str, list[Task]]:
+    """Tasks filed by project, without the empty parents `build_sections` needs."""
+    grouped: dict[str, list[Task]] = {}
+    for task in tasks:
+        grouped.setdefault(task.project, []).append(task)
+    return grouped
+
+
 def _count_subtrees(sections: list[Section], grouped: dict[str, list[Task]]) -> None:
-    """Fill in how many tasks each section holds once its sub-projects are counted in."""
+    """Fill in how many tasks each section holds once its sub-projects are counted in.
+
+    `grouped` holds the completed tasks even when the view hides them, so the counter keeps
+    reading "2 open / 5" instead of collapsing to "2 open / 2" the moment they are hidden.
+    """
     for section in sections:
         descendants = [
             tasks

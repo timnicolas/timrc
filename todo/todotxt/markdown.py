@@ -10,6 +10,8 @@ import re
 HEADING_RE = re.compile(r"^(#{1,6})(\s+)(.*)$")
 BULLET_RE = re.compile(r"^(\s*)([-*+]|\d+\.)(\s+)(.*)$")
 QUOTE_RE = re.compile(r"^(>\s?)(.*)$")
+# A task-list checkbox, on its own or right after a bullet marker
+CHECKBOX_RE = re.compile(r"^(\[[ xX]\])(\s*)(.*)$")
 
 # Inline marks, longest first so "**bold**" is not read as two italics
 INLINE_RE = re.compile(r"(`[^`\n]+`|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_)")
@@ -40,9 +42,19 @@ def line_markup(line: str, base: str = "text") -> list[tuple[str, str]]:
     bullet = BULLET_RE.match(line)
     if bullet:
         indent, marker, space, rest = bullet.groups()
-        return [(MARK, f"{indent}{marker}{space}"), *_inline_markup(rest, base)]
+        return [(MARK, f"{indent}{marker}{space}"), *_checkbox_markup(rest, base)]
 
-    return _inline_markup(line, base)
+    return _checkbox_markup(line, base)
+
+
+def _checkbox_markup(text: str, base: str) -> list[tuple[str, str]]:
+    """Colour a leading '[ ]' or '[x]' apart from the item it belongs to."""
+    checkbox = CHECKBOX_RE.match(text)
+    if not checkbox:
+        return _inline_markup(text, base)
+    box, space, rest = checkbox.groups()
+    attr = "md_checked" if box[1] in "xX" else "md_unchecked"
+    return [(attr, box), (base, space), *_inline_markup(rest, base)]
 
 
 def _inline_markup(text: str, base: str) -> list[tuple[str, str]]:

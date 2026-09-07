@@ -12,9 +12,10 @@ is expanded — expanding is what puts real line breaks in the markup of a singl
 
 import re
 
-from todotxt import markdown
+from todotxt import colors, markdown
 from todotxt.config import PRIORITY_ATTR
 from todotxt.model import CONTEXT_RE, NO_PROJECT, PROJECT_RE, TAG_RE, Task
+from todotxt.tui import palette
 from todotxt.view import Section
 
 CHECKED = "[x]"
@@ -51,10 +52,17 @@ def task_markup(task: Task, expanded: bool = False) -> list[tuple[str, str]]:
 
 
 def section_markup(section: Section, collapsed: bool) -> list[tuple[str, str]]:
-    """Markup for a project heading, with a counter of the whole sub-tree while it is folded."""
+    """Markup for a project heading, followed by the counter of its whole sub-tree."""
     marker = FOLD_CLOSED if collapsed else FOLD_OPEN
-    counter = f"  {section.subtree_open} open / {section.subtree_total}" if collapsed else ""
-    return [("section", f" {marker} {section.label}{counter}")]
+    attr = "section" if section.name == NO_PROJECT else palette.bold_attr_for(colors.PROJECT, section.name, "section")
+    return [(attr, f" {marker} {section.label}"), *section_counter_markup(section)]
+
+
+def section_counter_markup(section: Section) -> list[tuple[str, str]]:
+    """How much of a section's sub-tree is done, dimmed so it reads as an annotation."""
+    done = section.subtree_total - section.subtree_open
+    percent = round(100 * done / section.subtree_total) if section.subtree_total else 100
+    return [("dim", f"  {percent}% - {section.subtree_open} open / {section.subtree_total}")]
 
 
 def detail_header_markup(task: Task) -> list[tuple[str, str]]:
@@ -67,8 +75,9 @@ def detail_header_markup(task: Task) -> list[tuple[str, str]]:
     markup: list[tuple[str, str]] = [("completed" if task.completed else "text", f" {box} ")]
     if task.priority:
         markup.append((PRIORITY_ATTR.get(task.priority, "bold"), _priority_prefix(task)))
-    markup.append(("dim" if task.project == NO_PROJECT else "project", f"{task.project} "))
-    markup.extend(("context", f"@{context} ") for context in task.contexts)
+    project_attr = "dim" if task.project == NO_PROJECT else palette.attr_for(colors.PROJECT, task.project)
+    markup.append((project_attr, f"{task.project} "))
+    markup.extend((palette.attr_for(colors.CONTEXT, context), f"@{context} ") for context in task.contexts)
     markup.extend(("tag", f"{name}:{value} ") for name, value in task.tags)
     return markup
 
@@ -134,9 +143,9 @@ def _priority_prefix(task: Task) -> str:
 def _word_attr(word: str) -> str:
     """The palette attribute a description word is drawn with."""
     if PROJECT_RE.match(word):
-        return "project"
+        return palette.attr_for(colors.PROJECT, word)
     if CONTEXT_RE.match(word):
-        return "context"
+        return palette.attr_for(colors.CONTEXT, word)
     if TAG_RE.match(word):
         return "tag"
     return "text"

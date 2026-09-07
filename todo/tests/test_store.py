@@ -353,3 +353,68 @@ def test_rename_project_still_renames_a_line_in_non_canonical_order(store):
 
     assert store.rename_project("groceries", "courses") == 1
     assert "+courses" in store.todo_path.read_text(encoding="utf-8")
+
+
+def test_rename_context_renames_matching_tasks_and_returns_count(store):
+    """rename_context() rewrites every task under the old context and reports how many changed."""
+    store.add(Task.parse("buy milk @home"))
+    store.add(Task.parse("call mom @office"))
+    store.add(Task.parse("buy eggs @home"))
+    count = store.rename_context("home", "house")
+    assert count == 2
+    assert [task.description for task in store.load()] == [
+        "buy milk @house",
+        "call mom @office",
+        "buy eggs @house",
+    ]
+
+
+def test_rename_context_returns_zero_when_nothing_matches(store):
+    """rename_context() returns 0 when no task uses the old context name."""
+    store.add(Task.parse("buy milk @home"))
+    assert store.rename_context("nonexistent", "whatever") == 0
+
+
+def test_rename_context_does_not_rewrite_file_when_nothing_matches(store):
+    """rename_context() leaves the file untouched, blank lines and all, when nothing matches."""
+    store.todo_path.write_text("buy milk @home\n\ncall mom @office\n\n", encoding="utf-8")
+    original = store.todo_path.read_text(encoding="utf-8")
+    store.rename_context("nonexistent", "whatever")
+    assert store.todo_path.read_text(encoding="utf-8") == original
+
+
+def test_rename_context_preserves_line_order_and_count(store):
+    """rename_context() keeps the same number of lines in the same order, renamed in place."""
+    store.add(Task.parse("first @a"))
+    store.add(Task.parse("second @b"))
+    store.add(Task.parse("third @a"))
+    store.rename_context("a", "z")
+    assert read_lines(store.todo_path) == ["first @z", "second @b", "third @z"]
+
+
+def test_rename_context_leaves_unrelated_tasks_byte_identical(store):
+    """A task with no relation to the renamed context keeps its exact line, unchanged."""
+    store.add(Task.parse("(A) buy milk @home +groceries due:2016-05-30"))
+    store.add(Task.parse("call mom @office"))
+    store.rename_context("home", "house")
+    assert read_lines(store.todo_path)[1] == "call mom @office"
+
+
+def test_rename_context_ignores_a_line_that_only_needs_normalizing(store):
+    """A line in non-canonical order is not counted, nor rewritten, when no context matches.
+
+    Regression test: comparing the renamed line against the raw one made normalizing look like
+    a rename, inflating the count and rewriting untouched tasks.
+    """
+    store.todo_path.write_text("2016-05-20 (A) buy milk @home\ncall mom @office\n", encoding="utf-8")
+
+    assert store.rename_context("unrelated", "whatever") == 0
+    assert store.todo_path.read_text(encoding="utf-8") == "2016-05-20 (A) buy milk @home\ncall mom @office\n"
+
+
+def test_rename_context_still_renames_a_line_in_non_canonical_order(store):
+    """A task whose context matches is renamed even when its line was not canonical to start with."""
+    store.todo_path.write_text("2016-05-20 (A) buy milk @home\n", encoding="utf-8")
+
+    assert store.rename_context("home", "house") == 1
+    assert "@house" in store.todo_path.read_text(encoding="utf-8")

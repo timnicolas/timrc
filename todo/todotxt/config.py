@@ -35,6 +35,9 @@ CYAN = "#00c3c8"
 BG_SELECT = "#264f78"
 GREY = "#808080"
 
+# Suffix of the copy of an attribute drawn on the selection background
+SELECT_SUFFIX = "_on_select"
+
 # One step lighter than GREY, so a quote reads apart from the dimmed marker in front of it
 GREY_SOFT = "#a0a0a0"
 
@@ -68,41 +71,46 @@ PALETTE = [
     ("md_italic", "white,italics", "", "italics", f"{SHIMMER},italics", ""),
     ("md_quote", "light gray,italics", "", "italics", f"{GREY_SOFT},italics", ""),
     ("md_mark", "dark gray", "", "", GREY, ""),
+    ("md_unchecked", "yellow", "", "", YELLOW, ""),
+    ("md_checked", "light green", "", "", GREEN, ""),
 ]
 
 PRIORITY_ATTR = {"A": "priority_a", "B": "priority_b", "C": "priority_c"}
 
 
-# Suffix of the copy of an attribute drawn on the selection background
-SELECT_SUFFIX = "_on_select"
-
-
-def _selection_palette() -> list[tuple]:
-    """A copy of every entry over the selection background, keeping its own foreground.
+def selection_entry(entry: tuple) -> tuple:
+    """The copy of a palette entry drawn over the selection background, keeping its foreground.
 
     Mapping the whole focused row to a single attribute would be simpler, but it flattens the
     project, context and markdown colors exactly on the line the user is reading.
     """
-    return [
-        (f"{name}{SELECT_SUFFIX}", fg16 or "white", "dark blue", mono or "standout", fg or TEAL, BG_SELECT)
-        for name, fg16, _bg16, mono, fg, _bg in PALETTE
-    ]
+    name, fg16, _bg16, mono, fg, _bg = entry
+    return (f"{name}{SELECT_SUFFIX}", fg16 or "white", "dark blue", mono or "standout", fg or TEAL, BG_SELECT)
 
 
-PALETTE += _selection_palette()
+PALETTE = PALETTE + [selection_entry(entry) for entry in PALETTE]
 
 # Passed as the focus_map of every row, so a focused line gains the selection background
 # without losing what its colors mean
 FOCUS_MAP = {entry[0]: f"{entry[0]}{SELECT_SUFFIX}" for entry in PALETTE if not entry[0].endswith(SELECT_SUFFIX)}
 FOCUS_MAP[None] = "focus"
 
+
+def register_focus(name: str) -> None:
+    """Let an attribute registered after startup gain the selection background when focused."""
+    FOCUS_MAP[name] = f"{name}{SELECT_SUFFIX}"
+
+
 # Single source of truth for keybindings, read by the help screen: (keys, action label, section)
 KEYBINDINGS = [
     ("j / k", "Move down / up", "Navigation"),
     ("gg / G", "Go to top / bottom", "Navigation"),
     ("space / enter", "Unfold section or task", "Navigation"),
+    ("← / →", "Fold / unfold the project under the cursor", "Navigation"),
+    ("tab", "Move to the next section (list, detail, search)", "Navigation"),
     ("n", "New task", "Tasks"),
-    ("e", "Edit task / rename project", "Tasks"),
+    ("+", "New task in a project", "Tasks"),
+    ("e", "Edit task / rename and recolor a project", "Tasks"),
     ("shift+enter", "New line in the task editor", "Tasks"),
     ("x", "Toggle done", "Tasks"),
     ("p / P", "Priority up / down", "Tasks"),
@@ -114,8 +122,10 @@ KEYBINDINGS = [
     ("w", "Wrap long tasks on several lines", "View"),
     ("c", "Show / hide completed", "View"),
     ("C", "Confirm a task with no project", "View"),
+    (",", "Settings: rename and recolor every project and tag", "View"),
+    ("← / → · ↑ / ↓", "Change a color: settings menu · rename dialog", "View"),
     ("D", "Show / hide the detail pane", "View"),
-    ("+ / -", "Grow / shrink the detail pane", "View"),
+    ("= / -", "Grow / shrink the detail pane", "View"),
     ("click / drag", "Edit the body in the detail pane / move its border", "View"),
     ("/", "Search", "View"),
     ("r", "Refresh and clear search", "View"),

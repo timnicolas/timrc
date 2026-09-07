@@ -84,6 +84,12 @@ def _renamed_word(word: str, old: str, new: str) -> str:
     return word
 
 
+def _renamed_context(word: str, old: str, new: str) -> str:
+    """Rewrite an '@context' word when it names `old`. Contexts have no sub-names."""
+    match = CONTEXT_RE.match(word)
+    return f"@{new}" if match and match.group(1) == old else word
+
+
 @dataclass(frozen=True)
 class Task:
     """A single todo.txt line, split into the parts this application acts on."""
@@ -190,6 +196,12 @@ class Task:
         """
         old, new = old.lstrip("+"), new.lstrip("+")
         lines = [" ".join(_renamed_word(word, old, new) for word in line.split()) for line in self.lines]
+        return self.with_description(NEWLINE.join(lines))
+
+    def with_context_renamed(self, old: str, new: str) -> "Task":
+        """Return this task with context `old` renamed to `new`."""
+        old, new = old.lstrip("@"), new.lstrip("@")
+        lines = [" ".join(_renamed_context(word, old, new) for word in line.split()) for line in self.lines]
         return self.with_description(NEWLINE.join(lines))
 
     def with_description(self, description: str) -> "Task":

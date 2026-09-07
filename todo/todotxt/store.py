@@ -55,11 +55,19 @@ class TodoStore:
 
     def rename_project(self, old: str, new: str) -> int:
         """Rename a project across every task, its sub-projects included. Returns tasks changed."""
+        return self._rename(lambda task: task.with_project_renamed(old, new))
+
+    def rename_context(self, old: str, new: str) -> int:
+        """Rename a context across every task. Returns how many tasks changed."""
+        return self._rename(lambda task: task.with_context_renamed(old, new))
+
+    def _rename(self, rewrite) -> int:
+        """Apply a task rewrite to the whole file, counting only the lines it really changes."""
         lines = self._read_lines()
         changed = 0
         for position, line in enumerate(lines):
             task = Task.parse(line)
-            renamed = task.with_project_renamed(old, new)
+            renamed = rewrite(task)
             # Compared after parsing on both sides, so normalizing a line is never read as a rename
             if renamed.to_line() != task.to_line():
                 lines[position] = renamed.to_line()

@@ -122,18 +122,13 @@ def cmd_add(args: argparse.Namespace, store: TodoStore) -> int:
 def cmd_list(args: argparse.Namespace, store: TodoStore) -> int:
     """List tasks grouped by project, sub-projects nested under their parent, sorted with --sort.
 
-    Filtering by substring keywords is optional; a section with no keyword match is dropped.
+    The filter words share the query language of the interface: '+project' and '@context' terms
+    are OR'd within their kind and AND'd across kinds, '(A)' selects a priority, and anything
+    else has to appear in the line.
     """
     tasks = store.load()
-    sections = build_sections(tasks, ViewState(show_completed=args.all, sort=args.sort))
-
-    keywords = [word.lower() for word in args.filter]
-    if keywords:
-        sections = [
-            Section(section.name, matched, section.depth)
-            for section in sections
-            if (matched := [t for t in section.tasks if all(k in t.to_line().lower() for k in keywords)])
-        ]
+    state = ViewState(show_completed=args.all, sort=args.sort, search=" ".join(args.filter))
+    sections = [section for section in build_sections(tasks, state) if section.tasks]
 
     if not sections:
         print("No tasks.")
@@ -269,13 +264,15 @@ def cmd_normalize(args: argparse.Namespace, store: TodoStore) -> int:
 
 
 def cmd_rename(args: argparse.Namespace, store: TodoStore) -> int:
-    """Rename a project across every task, its sub-projects included."""
+    """Rename a project across every task, sub-projects included, or a context when given one."""
+    context = args.old.startswith("@")
+    rewrite = Task.with_context_renamed if context else Task.with_project_renamed
     if args.dry_run:
         # Compared against the task's own canonical line, so normalizing is never shown as a rename
         changes = [
             (task, renamed.to_line())
             for task in store.load()
-            if (renamed := task.with_project_renamed(args.old, args.new)).to_line() != task.to_line()
+            if (renamed := rewrite(task, args.old, args.new)).to_line() != task.to_line()
         ]
         if not changes:
             print("No tasks to rename.")
@@ -286,7 +283,7 @@ def cmd_rename(args: argparse.Namespace, store: TodoStore) -> int:
         print(f"{len(changes)} task(s) would be renamed.")
         return 0
 
-    count = store.rename_project(args.old, args.new)
+    count = store.rename_context(args.old, args.new) if context else store.rename_project(args.old, args.new)
     if not count:
         print("No tasks to rename.")
         return 0
@@ -294,14 +291,14 @@ def cmd_rename(args: argparse.Namespace, store: TodoStore) -> int:
     return 0
 
 
-def run_tui(store: TodoStore) -> int:
+def run_tui(store: TodoStore, search: str = "") -> int:
     """Launch the interactive TUI, importing it lazily since it lives in a sibling module."""
     try:
         from todotxt.tui.app import run
     except ImportError as error:
         print(f"Error: the TUI is not available ({error})", file=sys.stderr)
         return 1
-    run(store)
+    run(store, search=search)
     return 0
 
 
@@ -360,28 +357,47 @@ def build_parser() -> argparse.ArgumentParser:
     normalize_parser.set_defaults(func=cmd_normalize)
 
     rename_parser = subparsers.add_parser(
-        "rename", help="rename a project across every task, sub-projects included"
+        "rename", help="rename a project across every task, sub-projects included, or a @context"
     )
-    rename_parser.add_argument("old", help="project to rename, with or without its leading +")
-    rename_parser.add_argument("new", help="new project name, with or without its leading +")
+    rename_parser.add_argument("old", help="project to rename, or '@context' to rename a context")
+    rename_parser.add_argument("new", help="new name, with or without its leading + or @")
     rename_parser.add_argument(
         "-n", "--dry-run", action="store_true", help="show what would change without writing"
     )
     rename_parser.set_defaults(func=cmd_rename)
 
+    # Remembered so main can tell a subcommand from a filter meant for the TUI
+    parser.subcommands = set(subparsers.choices)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point: parse arguments and dispatch to the matching command, or launch the TUI."""
+    """Entry point: parse arguments and dispatch to the matching command, or launch the TUI.
+
+    Arguments that name no subcommand are a filter for the TUI, so `todo +phyling` opens the
+    interface already narrowed to that project.
+    """
     parser = build_parser()
-    args = parser.parse_args(argv)
+    words = sys.argv[1:] if argv is None else argv
     store = TodoStore(todo_path(), done_path())
 
+    if words and not words[0].startswith("-") and words[0] not in _subcommands(parser):
+        return run_tui(store, " ".join(words))
+
+    args = parser.parse_args(words)
     if not getattr(args, "command", None):
         return run_tui(store)
 
     return args.func(args, store)
+
+
+def _subcommands(parser: argparse.ArgumentParser) -> set[str]:
+    """Names argparse knows as subcommands, so anything else can be read as a filter."""
+    return {
+        name
+        for action in parser._subparsers._group_actions  # noqa: SLF001 - argparse exposes no public API
+        for name in action.choices
+    } if parser._subparsers else set()
 
 
 if __name__ == "__main__":

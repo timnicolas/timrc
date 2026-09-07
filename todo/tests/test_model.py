@@ -390,3 +390,57 @@ def test_with_project_renamed_task_without_project_is_unchanged():
     task = Task.parse("no project here", index=0)
     renamed = task.with_project_renamed("groceries", "shopping")
     assert renamed == task
+
+
+def test_with_context_renamed_simple():
+    """A plain context name is renamed in both the contexts tuple and the description."""
+    task = Task.parse("call mom @home", index=0)
+    renamed = task.with_context_renamed("home", "house")
+    assert renamed.contexts == ("house",)
+    assert renamed.description == "call mom @house"
+
+
+def test_with_context_renamed_leaves_similarly_named_context_untouched():
+    """Contexts have no hierarchy, so @homework is not touched when @home is renamed."""
+    task = Task.parse("call mom @home @homework", index=0)
+    renamed = task.with_context_renamed("home", "house")
+    assert renamed.contexts == ("house", "homework")
+    assert renamed.description == "call mom @house @homework"
+
+
+def test_with_context_renamed_preserves_multiline():
+    """Renaming a context on a multi-line task keeps the newline marker and the line split."""
+    task = Task.parse("first line @home\\nsecond line here", index=0)
+    renamed = task.with_context_renamed("home", "house")
+    assert renamed.lines == ["first line @house", "second line here"]
+    assert renamed.has_body is True
+
+
+def test_with_context_renamed_accepts_names_with_and_without_at_prefix():
+    """Both old and new names may be given with or without their leading '@'."""
+    task = Task.parse("call mom @home", index=0)
+    assert task.with_context_renamed("@home", "@house").contexts == ("house",)
+    assert task.with_context_renamed("home", "house").contexts == ("house",)
+    assert task.with_context_renamed("@home", "house").contexts == ("house",)
+
+
+def test_with_context_renamed_does_not_touch_a_project_of_the_same_name():
+    """Renaming a context never touches a project that happens to share its name."""
+    task = Task.parse("call mom @work +work", index=0)
+    renamed = task.with_context_renamed("work", "office")
+    assert renamed.contexts == ("office",)
+    assert renamed.projects == ("work",)
+
+
+def test_with_context_renamed_merges_into_an_existing_context():
+    """Renaming onto a context name already used by the task merges the two."""
+    task = Task.parse("call mom @home @house", index=0)
+    renamed = task.with_context_renamed("home", "house")
+    assert renamed.contexts == ("house", "house")
+
+
+def test_with_context_renamed_task_without_context_is_unchanged():
+    """A task carrying no context at all is returned unchanged."""
+    task = Task.parse("no context here", index=0)
+    renamed = task.with_context_renamed("home", "house")
+    assert renamed == task

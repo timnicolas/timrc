@@ -15,12 +15,15 @@ import sys
 
 from urwid.display import escape
 
-# xterm modifyOtherKeys level 2: modified keys are reported as CSI 27 ; modifier ; keycode ~
-MODIFY_OTHER_KEYS_ON = "\x1b[>4;2m"
+# xterm modifyOtherKeys, reporting a modified key as CSI 27 ; modifier ; keycode ~.
+# Level 1 escapes only the keys with no plain encoding, so ctrl-a and friends keep arriving
+# as ordinary control codes; level 2 would escape those too and urwid would show garbage.
+MODIFY_OTHER_KEYS_ON = "\x1b[>4;1m"
 MODIFY_OTHER_KEYS_OFF = "\x1b[>4;0m"
 
-# Keycode of Return, and the modifier digits urwid already knows how to name
-RETURN_KEYCODE = 13
+# The keys the protocol escapes, and the name each one should decode to. A space stays a space
+# whatever modifier came with it: in a text field there is nothing else it could mean.
+ESCAPED_KEYCODES = {13: "enter", 9: "tab", 32: " ", 8: "backspace"}
 MODIFIER_DIGITS = "2345678"
 
 # Signals that end the process quietly enough to restore the terminal on the way out
@@ -30,16 +33,18 @@ _enabled = False
 
 
 def patch_input_sequences() -> None:
-    """Teach urwid to decode the modified Return sequences of the modifyOtherKeys protocol.
+    """Teach urwid to decode the sequences the modifyOtherKeys protocol escapes.
 
     urwid compiles its sequence table into a trie when the module is imported, so appending to
     the table is not enough: the trie has to be rebuilt from it.
     """
     known = set(escape.input_sequences)
     for digit in MODIFIER_DIGITS:
-        entry = (f"[27;{digit};{RETURN_KEYCODE}~", f"{escape.escape_modifier(digit)}enter")
-        if entry not in known:
-            escape.input_sequences.append(entry)
+        for keycode, name in ESCAPED_KEYCODES.items():
+            key = name if name == " " else f"{escape.escape_modifier(digit)}{name}"
+            entry = (f"[27;{digit};{keycode}~", key)
+            if entry not in known:
+                escape.input_sequences.append(entry)
     escape.input_trie = escape.KeyqueueTrie(escape.input_sequences)
 
 

@@ -231,3 +231,22 @@ def test_rename_dry_run_shows_changes_without_writing(tmp_path):
     assert "+ buy milk +shopping" in result.stdout
     assert "1 task(s) would be renamed." in result.stdout
     assert todo_file.read_text(encoding="utf-8") == "buy milk +groceries\n"
+
+
+def test_rename_renames_a_context_when_the_old_name_carries_an_at_sign(tmp_path):
+    """`todo rename @old @new` renames a context instead of a project, and only the exact one."""
+    result, todo_file, _ = run_cli(
+        ["rename", "@home", "@work"], tmp_path, todo_content="call mum @home\nread @homework\n"
+    )
+    assert result.returncode == 0
+    assert "Renamed 1 task(s)." in result.stdout
+    assert todo_file.read_text(encoding="utf-8") == "call mum @work\nread @homework\n"
+
+
+def test_rename_dry_run_on_a_context_leaves_the_file_untouched(tmp_path):
+    """`todo rename -n @old @new` shows the context rename it would make without writing it."""
+    result, todo_file, _ = run_cli(
+        ["rename", "@home", "@work", "--dry-run"], tmp_path, todo_content="call mum @home\n"
+    )
+    assert "+ call mum @work" in result.stdout
+    assert todo_file.read_text(encoding="utf-8") == "call mum @home\n"
