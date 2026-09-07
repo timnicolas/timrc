@@ -83,6 +83,11 @@ Ne pas installer la config tmux
 ./install.sh --notmux
 ```
 
+Ne pas installer la config todo
+```bash
+./install.sh --notodo
+```
+
 ## Full installation linux
 
 ```

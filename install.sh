@@ -1,13 +1,14 @@
 #!/bin/zsh
 
 # usage
-USAGE="./install.sh [-h|--help] [-v|--verbose] [--novim] [--nozsh] [--notmux] [--nonvim]
+USAGE="./install.sh [-h|--help] [-v|--verbose] [--novim] [--nozsh] [--notmux] [--nonvim] [--notodo]
  -> [-h|--help]: print usage
  -> [-v|--verbose]: verbose mode
  -> [--novim]: dont install vim config
  -> [--nozsh]: dont install zsh config
  -> [--notmux]: dont install tmux config
  -> [--nonvim]: dont install nvim config
+ -> [--notodo]: dont install todo config
 "
 
 # arguments
@@ -16,6 +17,7 @@ ZSH=true
 VIM=true
 TMUX=true
 NVIM=true
+TODO=true
 LINT=true
 VERBOSE=false
 
@@ -42,6 +44,10 @@ do
 		;;
 		--nonvim)
 		NVIM=false
+		shift # past argument
+		;;
+		--notodo)
+		TODO=false
 		shift # past argument
 		;;
 		-v|--verbose)
@@ -96,4 +102,10 @@ fi
 if $TMUX; then
 	printf "${TITLE_S}install tmux${TITLE_E}"
 	zsh tmux/install_tmux.sh $args
+fi
+
+# install todo
+if $TODO; then
+	printf "${TITLE_S}install todo${TITLE_E}"
+	zsh todo/install_todo.sh $args
 fi
