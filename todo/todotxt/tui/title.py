@@ -1,8 +1,9 @@
-"""Naming the window after the view, so a pane running the app says 'todo' and what it shows.
+"""Naming the pane after the view, so the window label says 'todo' and what it shows.
 
-Setting the title through an escape sequence is not enough under tmux, which ignores it unless
-`allow-rename` is on, so the window is renamed through tmux itself. Renaming turns that window's
-automatic naming off, hence the restore on the way out.
+Only the pane title is set, never the window name: the app usually runs in one pane among
+several, and renaming the window would both freeze it — tmux turns `automatic-rename` off on
+the window it renames — and speak for the panes next door. Which pane the window is named
+after is tmux's call, made from `automatic-rename-format`.
 """
 
 import atexit
@@ -15,44 +16,63 @@ from todotxt.view import Query
 BASE = "todo"
 
 _shown = ""
+_previous: str | None = None
 
 
-def window_title(search: str) -> str:
+def pane_title(search: str) -> str:
     """'todo', followed by the projects the view is filtered on."""
     projects = Query.parse(search).projects
     return " ".join([BASE, *(f"+{project}" for project in projects)])
 
 
 def set_title(search: str) -> None:
-    """Name the window after the current filter, doing nothing when the name has not changed."""
-    global _shown
+    """Name the pane after the current filter, doing nothing when the name has not changed."""
+    global _shown, _previous
 
-    title = window_title(search)
+    title = pane_title(search)
     if title == _shown:
         return
+    if not _shown:
+        _previous = _read_pane_title()
+        atexit.register(restore_title)
     _shown = title
-    sys.stdout.write(f"\x1b]2;{title}\x07")
-    sys.stdout.flush()
-    _tmux("rename-window", title)
-    atexit.register(restore_title)
+    _write_title(title)
 
 
 def restore_title() -> None:
-    """Hand the window name back to whatever was naming it before."""
+    """Give the pane back the title it carried before the app took it over."""
     global _shown
 
     if not _shown:
         return
     _shown = ""
-    _tmux("set-window-option", "automatic-rename", "on")
+    if _previous is not None:
+        _write_title(_previous)
 
 
-def _tmux(command: str, *args: str) -> None:
-    """Run one tmux command against the pane we live in, and nothing at all outside tmux."""
+def _write_title(title: str) -> None:
+    """Set the title of the terminal we own, which tmux reads as the pane title."""
+    sys.stdout.write(f"\x1b]2;{title}\x07")
+    sys.stdout.flush()
+
+
+def _read_pane_title() -> str | None:
+    """The title our pane carried before we touched it, None outside tmux or on any hiccup.
+
+    Nothing is ever written back through tmux, only read: a title set through the escape
+    sequence lands on our own terminal, so a popup — where TMUX_PANE names the pane that
+    opened it rather than one of our own — cannot rename someone else's pane.
+    """
     pane = os.environ.get("TMUX_PANE")
     if not os.environ.get("TMUX") or not pane:
-        return
+        return None
     try:
-        subprocess.run(["tmux", command, "-t", pane, *args], check=False, capture_output=True)
+        result = subprocess.run(
+            ["tmux", "display-message", "-p", "-t", pane, "#{pane_title}"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
     except OSError:
-        pass
+        return None
+    return result.stdout.rstrip("\n") if result.returncode == 0 else None
