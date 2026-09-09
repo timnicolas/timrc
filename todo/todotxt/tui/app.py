@@ -4,7 +4,7 @@ from pathlib import Path
 
 import urwid
 
-from todotxt import colors, settings
+from todotxt import clipboard, colors, export, settings
 from todotxt.config import PALETTE, PRIORITY_LEVELS, SYNC_INTERVAL
 from todotxt.model import NO_PROJECT, PROJECT_SEPARATOR, Task, cycle_priority
 from todotxt.store import TaskNotFound, TodoStore
@@ -83,6 +83,7 @@ class TodoApp:
             on_edit_request=self._begin_detail_edit,
             on_accept=self._accept_detail_edit,
             on_next=self._leave_detail_for_search,
+            on_previous=self._leave_detail_for_list,
             on_cancel=self._end_detail_edit,
         )
         self.body = urwid.Pile([self.list_box])
@@ -119,6 +120,9 @@ class TodoApp:
             "=": lambda: self._resize_detail(1),
             "-": lambda: self._resize_detail(-1),
             "tab": self._focus_next_section,
+            "shift tab": self._focus_previous_section,
+            "y": self._copy_focused,
+            "Y": self._copy_all,
             "/": self._start_search,
             ",": self._show_settings,
             "r": self._refresh,
@@ -606,10 +610,18 @@ class TodoApp:
             return
         self._start_search()
 
+    def _focus_previous_section(self) -> None:
+        """Move the focus back one section, the same ring the other way round."""
+        self._start_search()
+
     def _leave_detail_for_search(self, task: Task, text: str) -> None:
         """Save what the pane holds, the way enter does, then carry the focus to the search."""
         self._accept_detail_edit(task, text)
         self._start_search()
+
+    def _leave_detail_for_list(self, task: Task, text: str) -> None:
+        """Save what the pane holds, then go back up to the list rather than on to the search."""
+        self._accept_detail_edit(task, text)
 
     def _start_search(self) -> None:
         """Send the focus to the always-visible search field, which filters as the query is typed."""
@@ -618,11 +630,13 @@ class TodoApp:
 
     def _search_key(self, key: str) -> None:
         """Enter and tab keep the query, esc drops it; the list follows every keystroke."""
-        if key not in ("enter", "esc", "tab"):
+        if key not in ("enter", "esc", "tab", "shift tab"):
             return
         if key == "esc":
             self.search.set_edit_text("")
         self._end_search()
+        if key == "shift tab":
+            self._begin_detail_edit()
 
     def _on_search_change(self, _widget: urwid.Edit, text: str) -> None:
         """Filter the list on every keystroke of the search field."""
@@ -705,9 +719,35 @@ class TodoApp:
 
     def _render(self) -> None:
         """Rebuild the rows from the current tasks and view state."""
-        self.list.rebuild(build_sections(self.tasks, self.state), self.state, self._empty_message())
+        self.list.rebuild(self._sections(), self.state, self._empty_message())
         self.list_box.set_title(f"tasks · sort: {self.state.sort.label}")
         self._update_status()
+
+    def _copy_focused(self) -> None:
+        """Copy what the cursor sits on: one task, or every task of a project heading."""
+        task = self.list.focused_task
+        if task is not None:
+            self._copy(export.task_text(task), "Task copied")
+            return
+        section = next((s for s in self._sections() if s.name == self.list.focused_header), None)
+        if section is not None:
+            self._copy(export.section_text(section), f"{section.name} copied")
+
+    def _copy_all(self) -> None:
+        """Copy the whole list as it is filtered right now."""
+        text = export.sections_text(self._sections())
+        if not text:
+            self._notify("Nothing to copy")
+            return
+        self._copy(text, "List copied")
+
+    def _copy(self, text: str, message: str) -> None:
+        """Hand `text` to the clipboard, saying so either way."""
+        self._notify(message if clipboard.copy(text) else "No clipboard command available")
+
+    def _sections(self) -> list:
+        """The sections the list currently shows, rebuilt from the tasks and the view state."""
+        return build_sections(self.tasks, self.state)
 
     def _empty_message(self) -> str:
         """What to show instead of the list when nothing is visible."""

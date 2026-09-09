@@ -71,10 +71,11 @@ class BodyEdit(HighlightedEdit):
 class DetailPane(urwid.WidgetWrap):
     """Box under the list showing the metadata and the body of a task, editable in place."""
 
-    def __init__(self, on_edit_request, on_accept, on_cancel, on_next):
+    def __init__(self, on_edit_request, on_accept, on_cancel, on_next, on_previous):
         self._on_edit_request = on_edit_request
         self._on_accept = on_accept
         self._on_next = on_next
+        self._on_previous = on_previous
         self._on_cancel = on_cancel
         self._row: Row | None = None
         self._editing = False
@@ -160,7 +161,7 @@ class DetailPane(urwid.WidgetWrap):
         self.update(self._row)
 
     def keypress(self, size, key: str) -> str | None:
-        """Tab saves and moves on, enter breaks the line, esc drops the edit.
+        """Tab saves and moves on, shift+tab saves and moves back, enter breaks the line, esc drops it.
 
         The body is prose written over several lines, so enter belongs to the text; leaving the
         pane by any other route than esc is what saves it.
@@ -169,6 +170,9 @@ class DetailPane(urwid.WidgetWrap):
             return key
         if key == "tab":
             self._on_next(self.task, self._edit.edit_text)
+            return None
+        if key == "shift tab":
+            self._on_previous(self.task, self._edit.edit_text)
             return None
         if key in ("enter", "shift enter"):
             self._edit.insert_text("\n")
